@@ -1,10 +1,18 @@
-const SimpleSmartContract = artifacts.require('SimpleSmartContract');
+const SimpleSmartContract = artifacts.require('Ballot');
 
-contract('SimpleSmartContract', () => {
+contract('Ballot', () => {
 	it('Deployment test', async() =>{
 		const simpleSmartContract = await SimpleSmartContract.deployed();
 		assert(simpleSmartContract.address != '');
-		console.log(simpleSmartContract.address);
+
+		let proposals = await simpleSmartContract.getProposals();
+
+		for (var i = 0; i < proposals.length; i++) {
+			let proposal = proposals[i];
+
+			console.log(web3.utils.hexToAscii(proposal.name));
+		}
+
 	});
 
 }
