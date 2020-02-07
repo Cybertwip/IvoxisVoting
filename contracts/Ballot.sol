@@ -1,4 +1,6 @@
 pragma solidity >=0.4.22 <0.7.0;
+pragma experimental ABIEncoderV2;
+
 
 import "./Owner.sol";
 
@@ -12,99 +14,76 @@ interface ERC20Interface {
  * @dev Implements voting process along with vote delegation
  */
 contract Ballot is Owner {
-   
+   ERC20Interface tokenContract;
+
     struct Voter {
-        uint weight; // weight is accumulated by delegation
+        uint weight; // weight is accumulated by token balance
         bool voted;  // if true, that person already voted
-        address delegate; // person delegated to
-        uint vote;   // index of the voted proposal
+        uint vote;   // yes or no (0 or 1)
     }
 
     struct Proposal {
         // If you can limit the length to a certain number of bytes, 
         // always use one of bytes1 to bytes32 because they are much cheaper
         bytes32 name;   // short name (up to 32 bytes)
-        uint voteCount; // number of accumulated votes
-    }
+        uint yesVoteCount; // number of accumulated votes saying yes
+        uint noVoteCount; // number of accumulated votes saying no
 
-    mapping(address => Voter) public voters;
+        uint dateProposed;
+        uint expirationDate;
+    }
 
     Proposal[] public proposals;
-    bytes32[] public proposalNames;
 
-    ERC20Interface tokenContract;
+    mapping(uint => mapping(address => Voter)) public voters;
 
+    uint currentVoteBatch;
 
     constructor() public {
-    }
 
-    function setProposals(bytes32[] memory _proposalNames) public isOwner{
-        delete proposals;
-        delete proposalNames;
-
-        for (uint i = 0; i < _proposalNames.length; i++) {
-            proposals.push(Proposal({
-                name: _proposalNames[i],
-                voteCount: 0
-            }));
-
-            proposalNames.push(_proposalNames[i]);
-        }        
     }
 
     function setERC20ContractAddress(address _address) external isOwner {
       tokenContract = ERC20Interface(_address);
     }
 
-    /**
-     * @dev Give your vote (including votes delegated to you) to proposal 'proposals[proposal].name'.
-     * @param proposal index of proposal in the proposals array
-     */
-    function vote(uint proposal) public {
-        Voter storage sender = voters[msg.sender];
+    function setProposal(bytes32 _proposalName) public isOwner{
 
-        uint voteWeight = tokenContract.balanceOf(msg.sender);
+        proposals.push(Proposal({
+            name: _proposalName,
+            yesVoteCount: 0,
+            noVoteCount: 0,
+            dateProposed: now,
+            expirationDate: now + 1 hours
+        }));
+
+        currentVoteBatch = proposals.length - 1;
+    }
+
+    function vote(uint yesNo) public {
+        Voter storage sender = voters[currentVoteBatch][msg.sender];
+
+        uint voteWeight = tokenContract.balanceOf(msg.sender) / 1 ether;
 
         require(voteWeight != 0, "Has no right to vote");
         require(!sender.voted, "Already voted.");
+        require(proposals[currentVoteBatch].expirationDate <= now, "Proposal time to vote expired");
 
         sender.weight = voteWeight;
         sender.voted = true;
-        sender.vote = proposal;
+        sender.vote = yesNo;
 
-        // If 'proposal' is out of the range of the array,
-        // this will throw automatically and revert all
-        // changes.
-        proposals[proposal].voteCount += sender.weight;
+        if(yesNo == 0){
+            proposals[currentVoteBatch].noVoteCount += sender.weight;            
+        }
+        else {
+            proposals[currentVoteBatch].yesVoteCount += sender.weight;                        
+        }
+
     }
     
-    function getProposalNames() public view returns(bytes32[] memory){
-        return proposalNames;
+    function getProposals() public view returns(Proposal[] memory){
+        return proposals;
     }
 
-    /** 
-     * @dev Computes the winning proposal taking all previous votes into account.
-     * @return winningProposal_ index of winning proposal in the proposals array
-     */
-    function winningProposal() public view
-            returns (uint winningProposal_)
-    {
-        uint winningVoteCount = 0;
-        for (uint p = 0; p < proposals.length; p++) {
-            if (proposals[p].voteCount > winningVoteCount) {
-                winningVoteCount = proposals[p].voteCount;
-                winningProposal_ = p;
-            }
-        }
-    }
-
-    /** 
-     * @dev Calls winningProposal() function to get the index of the winner contained in the proposals array and then
-     * @return winnerName_ the name of the winner
-     */
-    function winnerName() public view
-            returns (bytes32 winnerName_)
-    {
-        winnerName_ = proposals[winningProposal()].name;
-    }
 }
