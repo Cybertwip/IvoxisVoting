@@ -36,6 +36,7 @@ contract Ballot is Owner {
     Proposal[] public proposals;
 
     mapping(uint => mapping(address => Voter)) public voters;
+    mapping(uint => uint) public totalVoters;
 
     uint currentVoteBatch;
 
@@ -54,7 +55,7 @@ contract Ballot is Owner {
             yesVoteCount: 0,
             noVoteCount: 0,
             dateProposed: now,
-            expirationDate: now + 1 hours
+            expirationDate: now + 4 seconds
         }));
 
         currentVoteBatch = proposals.length - 1;
@@ -63,15 +64,17 @@ contract Ballot is Owner {
     function vote(uint yesNo) public {
         Voter storage sender = voters[currentVoteBatch][msg.sender];
 
-        uint voteWeight = tokenContract.balanceOf(msg.sender) / 1 ether;
+        uint voteWeight = tokenContract.balanceOf(msg.sender);
 
-        require(voteWeight != 0, "Has no right to vote");
+        require(voteWeight != 0, "Has no tokens, and no right to vote");
         require(!sender.voted, "Already voted.");
-        require(proposals[currentVoteBatch].expirationDate <= now, "Proposal time to vote expired");
+        require(proposals[currentVoteBatch].expirationDate >= now, "Proposal time to vote expired");
 
         sender.weight = voteWeight;
         sender.voted = true;
         sender.vote = yesNo;
+
+        totalVoters[currentVoteBatch] = totalVoters[currentVoteBatch] + 1;
 
         if(yesNo == 0){
             proposals[currentVoteBatch].noVoteCount += sender.weight;            
@@ -84,6 +87,10 @@ contract Ballot is Owner {
     
     function getProposals() public view returns(Proposal[] memory){
         return proposals;
+    }
+
+    function getVoters() public view returns(Voter[] memory){
+        
     }
 
 }
