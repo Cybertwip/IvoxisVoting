@@ -26,7 +26,7 @@ contract Ballot is Owner {
     struct Proposal {
         // If you can limit the length to a certain number of bytes, 
         // always use one of bytes1 to bytes32 because they are much cheaper
-        bytes32 name;   // short name (up to 32 bytes)
+        string name;   // short name (up to 32 bytes)
         uint yesVoteCount; // number of accumulated votes saying yes
         uint noVoteCount; // number of accumulated votes saying no
 
@@ -50,14 +50,14 @@ contract Ballot is Owner {
       tokenContract = ERC20Interface(_address);
     }
 
-    function setProposal(bytes32 _proposalName) public isOwner{
+    function setProposal(string memory _proposalName) public isOwner{
 
         proposals.push(Proposal({
             name: _proposalName,
             yesVoteCount: 0,
             noVoteCount: 0,
             dateProposed: now,
-            expirationDate: now + 4 seconds
+            expirationDate: now + 30 days
         }));
 
         currentVoteBatch = proposals.length - 1;
@@ -87,6 +87,14 @@ contract Ballot is Owner {
             proposals[currentVoteBatch].yesVoteCount += sender.weight;                        
         }
 
+    }
+    
+    function getLatestProposal() public view returns(Proposal memory){
+        uint voteWeight = tokenContract.balanceOf(msg.sender);
+
+        require(voteWeight != 0, "Has no tokens, and no right to vote");
+        
+        return proposals[proposals.length -1];
     }
     
     function getProposals() public view returns(Proposal[] memory){
