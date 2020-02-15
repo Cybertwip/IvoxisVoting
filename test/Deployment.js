@@ -297,7 +297,7 @@ contract('Ballot', () => {
 		
 		web3.eth.defaultAccount = web3.eth.accounts[0];
 
-		let voters = await ballot.voters(0, accounts[0]);
+		let voters = await ballot.getVoters(0);
 
 		console.log(voters);
 

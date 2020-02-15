@@ -17,6 +17,7 @@ contract Ballot is Owner {
    ERC20Interface tokenContract;
 
     struct Voter {
+        address voterAddress;
         uint weight; // weight is accumulated by token balance
         bool voted;  // if true, that person already voted
         uint vote;   // yes or no (0 or 1)
@@ -36,7 +37,8 @@ contract Ballot is Owner {
     Proposal[] public proposals;
 
     mapping(uint => mapping(address => Voter)) public voters;
-    mapping(uint => uint) public totalVoters;
+
+    mapping(uint => Voter[]) totalVoters;
 
     uint currentVoteBatch;
 
@@ -73,8 +75,10 @@ contract Ballot is Owner {
         sender.weight = voteWeight;
         sender.voted = true;
         sender.vote = yesNo;
+        sender.voterAddress = msg.sender;
 
-        totalVoters[currentVoteBatch] = totalVoters[currentVoteBatch] + 1;
+        totalVoters[currentVoteBatch].push(sender);
+
 
         if(yesNo == 0){
             proposals[currentVoteBatch].noVoteCount += sender.weight;            
@@ -86,11 +90,19 @@ contract Ballot is Owner {
     }
     
     function getProposals() public view returns(Proposal[] memory){
+        uint voteWeight = tokenContract.balanceOf(msg.sender);
+
+        require(voteWeight != 0, "Has no tokens, and no right to vote");
+
         return proposals;
     }
 
-    function getVoters() public view returns(Voter[] memory){
-        
+    function getVoters(uint voteBatch) public view returns(Voter[] memory){
+        uint voteWeight = tokenContract.balanceOf(msg.sender);
+
+        require(voteWeight != 0, "Has no tokens, and no right to vote");
+
+        return totalVoters[voteBatch];
     }
 
 }
