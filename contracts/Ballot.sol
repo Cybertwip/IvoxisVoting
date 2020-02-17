@@ -34,9 +34,9 @@ contract Ballot is Owner {
         uint expirationDate;
     }
 
-    Proposal[] public proposals;
+    Proposal[] private proposals;
 
-    mapping(uint => mapping(address => Voter)) public voters;
+    mapping(uint => mapping(address => Voter)) private voters;
 
     mapping(uint => Voter[]) totalVoters;
 
@@ -89,28 +89,49 @@ contract Ballot is Owner {
 
     }
     
-    function getLatestProposal() public view returns(Proposal memory){
+    function getLatestProposal() public view returns(string memory name, uint yesCount, uint noCount, uint proposed, uint expiration){
         uint voteWeight = tokenContract.balanceOf(msg.sender);
 
         require(voteWeight != 0, "Has no tokens, and no right to vote");
+        require(proposals.length != 0, "No proposals made yet");
         
-        return proposals[proposals.length -1];
+        name = proposals[proposals.length -1].name;
+        yesCount = proposals[proposals.length -1].yesVoteCount;
+        noCount = proposals[proposals.length -1].noVoteCount;
+        proposed = proposals[proposals.length -1].dateProposed;
+        expiration = proposals[proposals.length -1].expirationDate;
     }
     
-    function getProposals() public view returns(Proposal[] memory){
+    function getProposal(uint voteBatch) public view returns(string memory name, uint yesCount, uint noCount, uint proposed, uint expiration){
         uint voteWeight = tokenContract.balanceOf(msg.sender);
 
         require(voteWeight != 0, "Has no tokens, and no right to vote");
+        require(proposals.length > voteBatch, "Vote batch has not happened");
+        
+        name = proposals[voteBatch].name;
+        yesCount = proposals[voteBatch].yesVoteCount;
+        noCount = proposals[voteBatch].noVoteCount;
+        proposed = proposals[voteBatch].dateProposed;
+        expiration = proposals[voteBatch].expirationDate;
 
-        return proposals;
     }
 
-    function getVoters(uint voteBatch) public view returns(Voter[] memory){
+    function getVoters(uint voteBatch) public view returns(address[] memory addresses, uint[] memory weights, bool[] memory voted, uint[] memory votes){
         uint voteWeight = tokenContract.balanceOf(msg.sender);
 
         require(voteWeight != 0, "Has no tokens, and no right to vote");
 
-        return totalVoters[voteBatch];
+        addresses = new address[](totalVoters[voteBatch].length);
+        weights = new uint[](totalVoters[voteBatch].length);
+        voted = new bool[](totalVoters[voteBatch].length);
+        votes = new uint[](totalVoters[voteBatch].length);
+        
+        for(uint i = 0; i<totalVoters[voteBatch].length; i++) {
+            addresses[i] = totalVoters[voteBatch][i].voterAddress;
+            weights[i] = totalVoters[voteBatch][i].weight;
+            voted[i] = totalVoters[voteBatch][i].voted;
+            votes[i] = totalVoters[voteBatch][i].vote;
+        }
     }
 
 }
