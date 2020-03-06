@@ -1,5 +1,4 @@
 pragma solidity >=0.4.22 <0.7.0;
-pragma experimental ABIEncoderV2;
 
 
 import "./Owner.sol";
@@ -20,13 +19,14 @@ contract Ballot is Owner {
         address voterAddress;
         uint weight; // weight is accumulated by token balance
         bool voted;  // if true, that person already voted
-        uint vote;   // yes or no (0 or 1)
+        uint decision;   // yes or no (1 or 0)
     }
 
     struct Proposal {
         // If you can limit the length to a certain number of bytes, 
         // always use one of bytes1 to bytes32 because they are much cheaper
-        string name;   // short name (up to 32 bytes)
+        string title;
+        string description;    
         uint yesVoteCount; // number of accumulated votes saying yes
         uint noVoteCount; // number of accumulated votes saying no
 
@@ -50,10 +50,12 @@ contract Ballot is Owner {
       tokenContract = ERC20Interface(_address);
     }
 
-    function setProposal(string memory _proposalName) public isOwner{
+
+    function addProposal(string memory _title, string memory _description) public isOwner{
 
         proposals.push(Proposal({
-            name: _proposalName,
+            title: _title,
+            description: _description,
             yesVoteCount: 0,
             noVoteCount: 0,
             dateProposed: now,
@@ -63,28 +65,46 @@ contract Ballot is Owner {
         currentVoteBatch = proposals.length - 1;
     }
 
-    function vote(uint yesNo) public {
-        Voter storage sender = voters[currentVoteBatch][msg.sender];
+    function editProposal(uint voteBatch, string memory _title, string memory _description) public isOwner{
+        proposals[voteBatch].title = _title;
+        proposals[voteBatch].description = _description;        
+        proposals[voteBatch].yesVoteCount = 0;
+        proposals[voteBatch].noVoteCount = 0;
+        proposals[voteBatch].dateProposed = now;
+        proposals[voteBatch].expirationDate = now + 30 days;
+
+        for(uint i = 0; i<totalVoters[voteBatch].length; i++) {
+            totalVoters[voteBatch][i].voted = false;
+            totalVoters[voteBatch][i].decision = 0;
+        }
+
+
+    }
+
+    function vote(uint voteBatch, uint yesNo) public {
+        Voter storage sender = voters[voteBatch][msg.sender];
 
         uint voteWeight = tokenContract.balanceOf(msg.sender);
 
         require(voteWeight != 0, "Has no tokens, and no right to vote");
         require(!sender.voted, "Already voted.");
-        require(proposals[currentVoteBatch].expirationDate >= now, "Proposal time to vote expired");
+        require(proposals[voteBatch].expirationDate >= now, "Proposal time to vote expired");
+        require(proposals.length > voteBatch);
+
 
         sender.weight = voteWeight;
         sender.voted = true;
-        sender.vote = yesNo;
+        sender.decision = yesNo;
         sender.voterAddress = msg.sender;
 
-        totalVoters[currentVoteBatch].push(sender);
+        totalVoters[voteBatch].push(sender);
 
 
         if(yesNo == 0){
-            proposals[currentVoteBatch].noVoteCount += sender.weight;            
+            proposals[voteBatch].noVoteCount += sender.weight;            
         }
         else {
-            proposals[currentVoteBatch].yesVoteCount += sender.weight;                        
+            proposals[voteBatch].yesVoteCount += sender.weight;                        
         }
 
     }
@@ -98,26 +118,28 @@ contract Ballot is Owner {
         return proposals.length - 1;
     }
     
-    function getLatestProposal() public view returns(string memory name, uint yesCount, uint noCount, uint proposed, uint expiration){
+    function getLatestProposal() public view returns(string memory title, string memory description, uint yesCount, uint noCount, uint proposed, uint expiration){
         uint voteWeight = tokenContract.balanceOf(msg.sender);
 
         require(voteWeight != 0, "Has no tokens, and no right to vote");
         require(proposals.length != 0, "No proposals made yet");
         
-        name = proposals[proposals.length -1].name;
+        title = proposals[proposals.length -1].title;
+        description = proposals[proposals.length -1].description;
         yesCount = proposals[proposals.length -1].yesVoteCount;
         noCount = proposals[proposals.length -1].noVoteCount;
         proposed = proposals[proposals.length -1].dateProposed;
         expiration = proposals[proposals.length -1].expirationDate;
     }
     
-    function getProposal(uint voteBatch) public view returns(string memory name, uint yesCount, uint noCount, uint proposed, uint expiration){
+    function getProposal(uint voteBatch) public view returns(string memory title, string memory description, uint yesCount, uint noCount, uint proposed, uint expiration){
         uint voteWeight = tokenContract.balanceOf(msg.sender);
 
         require(voteWeight != 0, "Has no tokens, and no right to vote");
         require(proposals.length > voteBatch, "Vote batch has not happened");
         
-        name = proposals[voteBatch].name;
+        title = proposals[voteBatch].title;
+        description = proposals[voteBatch].description;        
         yesCount = proposals[voteBatch].yesVoteCount;
         noCount = proposals[voteBatch].noVoteCount;
         proposed = proposals[voteBatch].dateProposed;
@@ -125,7 +147,11 @@ contract Ballot is Owner {
 
     }
 
-    function getVoters(uint voteBatch) public view returns(address[] memory addresses, uint[] memory weights, bool[] memory voted, uint[] memory votes){
+    function getVoters(uint voteBatch) public view 
+    returns(address[] memory addresses, 
+            uint[] memory weights, 
+            bool[] memory voted, 
+            uint[] memory decisions){
         uint voteWeight = tokenContract.balanceOf(msg.sender);
 
         require(voteWeight != 0, "Has no tokens, and no right to vote");
@@ -133,14 +159,31 @@ contract Ballot is Owner {
         addresses = new address[](totalVoters[voteBatch].length);
         weights = new uint[](totalVoters[voteBatch].length);
         voted = new bool[](totalVoters[voteBatch].length);
-        votes = new uint[](totalVoters[voteBatch].length);
+        decisions = new uint[](totalVoters[voteBatch].length);
         
         for(uint i = 0; i<totalVoters[voteBatch].length; i++) {
             addresses[i] = totalVoters[voteBatch][i].voterAddress;
             weights[i] = totalVoters[voteBatch][i].weight;
             voted[i] = totalVoters[voteBatch][i].voted;
-            votes[i] = totalVoters[voteBatch][i].vote;
+            decisions[i] = totalVoters[voteBatch][i].decision;
         }
+    }
+
+    function getVoter(uint voteBatch) public view 
+    returns(address voterAddress, 
+            uint  weight, 
+            bool  voted, 
+            uint  decision){
+        uint voteWeight = tokenContract.balanceOf(msg.sender);
+
+        require(voteWeight != 0, "Has no tokens, and no right to vote");
+
+        Voter memory sender = voters[voteBatch][msg.sender];
+
+        voterAddress = sender.voterAddress;
+        weight = sender.weight;
+        voted = sender.voted;
+        decision = sender.decision;
     }
 
 }
