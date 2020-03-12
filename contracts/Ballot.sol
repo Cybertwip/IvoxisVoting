@@ -109,13 +109,12 @@ contract Ballot is Owner {
 
     }
     
-    function getLatestVoteBatch() public view returns(uint){
+    function getLatestVoteBatch() public view returns(int){
         uint voteWeight = tokenContract.balanceOf(msg.sender);
 
         require(voteWeight != 0, "Has no tokens, and no right to vote");
-        require(proposals.length != 0, "No proposals made yet");
 
-        return proposals.length - 1;
+        return int(proposals.length) - 1;
     }
     
     function getLatestProposal() public view returns(string memory title, string memory description, uint yesCount, uint noCount, uint proposed, uint expiration){
