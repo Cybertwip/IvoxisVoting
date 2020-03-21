@@ -1,7 +1,6 @@
 pragma solidity >=0.4.22 <0.7.0;
 
-
-import "./Owner.sol";
+import "./Authorizable.sol";
 
 interface ERC20Interface {
     function totalSupply() external view returns (uint);
@@ -12,7 +11,7 @@ interface ERC20Interface {
  * @title Ballot
  * @dev Implements voting process along with vote delegation
  */
-contract Ballot is Owner {
+contract Ballot is Authorizable {
    ERC20Interface tokenContract;
 
     struct Voter {
@@ -42,16 +41,16 @@ contract Ballot is Owner {
 
     uint currentVoteBatch;
 
-    constructor() public {
 
+    constructor() public {
     }
 
-    function setERC20ContractAddress(address _address) external isOwner {
+    function setERC20ContractAddress(address _address) external onlyAuthorized {
       tokenContract = ERC20Interface(_address);
     }
 
 
-    function addProposal(string memory _title, string memory _description) public isOwner{
+    function addProposal(string memory _title, string memory _description) public onlyAuthorized {
 
         proposals.push(Proposal({
             title: _title,
@@ -65,7 +64,10 @@ contract Ballot is Owner {
         currentVoteBatch = proposals.length - 1;
     }
 
-    function editProposal(uint voteBatch, string memory _title, string memory _description) public isOwner{
+    function editProposal(uint voteBatch, string memory _title, string memory _description) public onlyAuthorized {
+        
+        require(proposals.length > voteBatch, "Proposal has not happened yet");
+
         proposals[voteBatch].title = _title;
         proposals[voteBatch].description = _description;        
         proposals[voteBatch].yesVoteCount = 0;
@@ -89,7 +91,7 @@ contract Ballot is Owner {
         require(voteWeight != 0, "Has no tokens, and no right to vote");
         require(!sender.voted, "Already voted.");
         require(proposals[voteBatch].expirationDate >= now, "Proposal time to vote expired");
-        require(proposals.length > voteBatch);
+        require(proposals.length > voteBatch, "Proposal has not happened yet");
 
 
         sender.weight = voteWeight;

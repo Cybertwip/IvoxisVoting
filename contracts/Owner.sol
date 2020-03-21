@@ -6,7 +6,7 @@ pragma solidity >=0.4.22 <0.7.0;
  */
 contract Owner {
 
-    address private owner;
+    address internal owner;
     
     // event for EVM logging
     event OwnerSet(address indexed oldOwner, address indexed newOwner);
